@@ -2,7 +2,7 @@ import discord
 import os
 import json
 import random
-import spacy
+import re
 from discord.ext import commands
 from discord import app_commands
 
@@ -29,6 +29,40 @@ if os.path.exists(DATA_FILE):
         channel_messages = {}
 else:
     channel_messages = {}
+
+def generate_sentence(words):
+    if not words:
+        return ""
+
+    # Create bigrams from the word list
+    bigrams = list(zip(words, words[1:]))
+
+    # Start the sentence with a random word
+    current_word = random.choice(words)
+    sentence = [current_word]
+
+    while len(sentence) < 10:  # Limit sentence length to 10 words
+        # Find all bigrams that can follow the current word
+        candidates = [b[1] for b in bigrams if b[0] == current_word]
+        if not candidates:
+            break
+        next_word = random.choice(candidates)
+        sentence.append(next_word)
+        current_word = next_word
+
+    return " ".join(sentence)
+
+def clean_message(content):
+    # Remove links (http, https, www)
+    content = re.sub(r'http\S+|www\S+', '', content)
+    
+    # Remove Discord IDs (17-19 digit numbers)
+    content = re.sub(r'\b\d{17,19}\b', '', content)
+    
+    # Remove emojis (using regex for Unicode emoji ranges)
+    content = re.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002700-\U000027BF]', '', content)
+    
+    return content
 
 @bot.event
 async def on_ready():
@@ -67,15 +101,17 @@ async def on_message(message):
     if message_counters[channel_id] >= threshold:
         message_counters[channel_id] = 0  # Reset the counter
 
-        # Process the messages with spaCy
-        doc = nlp(' '.join(channel_messages[channel_id]))
+        # Flatten all words in the channel's messages and clean them
+        all_words = []
+        for msg in channel_messages[channel_id]:
+            cleaned_msg = clean_message(msg.lower())  # Clean the message to remove unwanted parts
+            words = re.findall(r'\b\w+\b', cleaned_msg)  # Extract remaining words
+            all_words.extend(words)
 
-        # Collect nouns from the messages
-        nouns = [token.text for token in doc if token.pos_ == 'NOUN']
+        # Generate a sentence from the words
+        response = generate_sentence(all_words)
 
-        # If there are enough nouns, respond with a random selection
-        if len(nouns) > 0:
-            response = " ".join(random.sample(nouns, min(len(nouns), 10)))
+        if response:
             await message.channel.send(response)
 
 @bot.tree.command(name="clear", description="Löscht alle gespeicherten Nachrichten in diesem Kanal.")

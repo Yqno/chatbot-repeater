@@ -6,8 +6,7 @@ import re
 from discord.ext import commands
 from discord import app_commands
 
-# Initialize spaCy and load the English model
-nlp = spacy.load('en_core_web_sm')
+
 
 TOKEN = ""  # Token here
 DATA_FILE = 'channel_messages.json'

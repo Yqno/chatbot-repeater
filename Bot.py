@@ -2,12 +2,16 @@ import discord
 import os
 import json
 import random
+import spacy
 from discord.ext import commands
 from discord import app_commands
 
-TOKEN = "" # Token here
+# Initialize spaCy and load the English model
+nlp = spacy.load('en_core_web_sm')
+
+TOKEN = ""  # Token here
 DATA_FILE = 'channel_messages.json'
-ALLOWED_CHANNELS = []  # Channel ID's here
+ALLOWED_CHANNELS = []  # Channel IDs here
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -63,17 +67,15 @@ async def on_message(message):
     if message_counters[channel_id] >= threshold:
         message_counters[channel_id] = 0  # Reset the counter
 
-        # Flatten all words in the channel's messages
-        all_words = [word for msg in channel_messages[channel_id] for word in msg.split()]
+        # Process the messages with spaCy
+        doc = nlp(' '.join(channel_messages[channel_id]))
 
-        # Select a random sample of words
-        sample_size = min(len(all_words), 10)
-        sampled_words = random.sample(all_words, sample_size)
+        # Collect nouns from the messages
+        nouns = [token.text for token in doc if token.pos_ == 'NOUN']
 
-        # Form a sentence from the sampled words
-        response = " ".join(sampled_words)
-
-        if response:
+        # If there are enough nouns, respond with a random selection
+        if len(nouns) > 0:
+            response = " ".join(random.sample(nouns, min(len(nouns), 10)))
             await message.channel.send(response)
 
 @bot.tree.command(name="clear", description="Löscht alle gespeicherten Nachrichten in diesem Kanal.")
